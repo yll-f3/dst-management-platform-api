@@ -1,0 +1,34 @@
+FROM ubuntu:24.04
+
+WORKDIR /root
+
+ENV HOME=/root
+ENV DMP_IN_CONTAINER=1
+
+# 先安装基础依赖
+RUN dpkg --add-architecture i386 \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        screen \
+        wget \
+        curl \
+        lib32gcc-s1 \
+        libcurl4:i386 \
+        libc6:i386 \
+        libstdc++6:i386 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /root/data /root/.klei
+
+# 复制 manual_install.sh 和 luajit 文件
+COPY embedFS/shell/manual_install.sh /root/manual_install.sh
+COPY embedFS/luajit /root/dmp_files/luajit
+
+# 执行安装脚本
+RUN chmod +x /root/manual_install.sh \
+    && DMP_IN_CONTAINER=1 HOME=/root bash /root/manual_install.sh \
+    && rm -f /root/manual_install.sh
+
+# 设置环境变量
+ENV PATH="/root/steamcmd:/root/dst/bin64:${PATH}"
