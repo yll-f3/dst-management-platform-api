@@ -1,0 +1,6 @@
+{
+  "serverPortStart": 11041,
+  "masterPortStart": 21000,
+  "masterServerPortStart": 31000,
+  "authenticationPortStart": 41000
+}
