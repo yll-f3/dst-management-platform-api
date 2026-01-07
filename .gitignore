@@ -2,3 +2,6 @@
 docker/data/
 docker/.klei/
 docker/logs/
+docker_1/data/
+docker_1/.klei/
+docker_1/logs/
