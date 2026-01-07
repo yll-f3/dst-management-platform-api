@@ -1,0 +1,43 @@
+services:
+
+  dmp:
+    image: dmp-tag:v1.0.0
+    
+    container_name: dmp-server-1
+
+    ports:
+      - "11041-11050:11041-11050/udp"
+
+    volumes:
+      - ./.klei:/root/.klei
+      - ./data:/root/data
+      - ./logs:/root/logs
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    
+    networks:
+      - dmp-network
+
+    environment:
+      - PGID=$(id -g)
+      - PUID=$(id -u)
+      - DMP_PORT=80
+      - LEVEL=info
+      
+  nginx:
+    image: nginx:alpine
+    container_name: dmp-nginx-server-1
+    ports:
+      - "9001:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../../dst-management-platform-web/dist:/usr/share/nginx/html:ro
+      - ./ports.config.json:/etc/nginx/ports.config.json:ro
+    networks:
+      - dmp-network
+    depends_on:
+      - dmp
+
+networks:
+  dmp-network:
+    driver: bridge
