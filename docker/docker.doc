@@ -1,0 +1,20 @@
+在项目根目录执行以下命令构建基础镜像：
+
+```bash
+docker build -f docker/Dockerfile.base -t dmp-base:latest .
+```
+
+**说明：**
+- `-f docker/Dockerfile.base` - 指定 Dockerfile 文件路径
+- `-t dmp-base:latest` - 给镜像打标签
+- `.` - 构建上下文为当前目录（项目根目录）
+
+**确保你在项目根目录下执行：**
+
+```bash
+cd /Users/yll/Documents/yy_dmp/dst-management-platform-api
+docker build -f docker/Dockerfile.base -t dmp-base:latest .
+```
+
+
+docker build -f docker/Dockerfile -t dmp-tag:v1.0.0 .
