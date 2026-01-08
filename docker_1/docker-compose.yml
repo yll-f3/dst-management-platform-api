@@ -12,6 +12,7 @@ services:
       - ./.klei:/root/.klei
       - ./data:/root/data
       - ./logs:/root/logs
+      - ./backup:/root/dmp_files/backup
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
     
