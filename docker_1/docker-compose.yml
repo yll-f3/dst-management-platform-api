@@ -25,13 +25,12 @@ services:
       - LEVEL=info
       
   nginx:
-    image: nginx:alpine
+    image: dmp-nginx-web:latest
     container_name: dmp-nginx-server-1
     ports:
       - "9001:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ../../dst-management-platform-web/dist:/usr/share/nginx/html:ro
       - ./ports.config.json:/etc/nginx/ports.config.json:ro
     networks:
       - dmp-network
