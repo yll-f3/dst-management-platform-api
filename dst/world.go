@@ -6,6 +6,7 @@ import (
 	"dst-management-platform-api/logger"
 	"dst-management-platform-api/utils"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
@@ -349,7 +350,6 @@ authentication_port = ` + strconv.Itoa(world.AuthenticationPort) + `
 encode_user_path = ` + strconv.FormatBool(world.EncodeUserPath)
 	return contents
 }
-
 func (g *Game) getOnlinePlayerList(id int) ([]string, error) {
 	world, err := g.getWorldByID(id)
 	if err != nil {
@@ -361,15 +361,25 @@ func (g *Game) getOnlinePlayerList(id int) ([]string, error) {
 	if err != nil {
 		return []string{}, err
 	}
+
 	// 等待命令执行完毕
 	time.Sleep(time.Second * 2)
+
 	// 获取日志文件中的list
 	logPath := fmt.Sprintf("%s/server_log.txt", world.worldPath)
+
+	// 使用反向读取，只读取最后几KB
+	return readPlayerListFromEnd(logPath)
+}
+
+func readPlayerListFromEnd(logPath string) ([]string, error) {
+	const bufferSize = 1024 * 4 // 4KB buffer
+
+	// 打开文件
 	file, err := os.Open(logPath)
 	if err != nil {
 		return nil, err
 	}
-
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
@@ -377,28 +387,47 @@ func (g *Game) getOnlinePlayerList(id int) ([]string, error) {
 		}
 	}(file)
 
-	// 逐行读取文件
-	scanner := bufio.NewScanner(file)
-	var linesAfterKeyword []string
-	var lines []string
-	keyword := "playerlist 99999999 [0]"
-	var foundKeyword bool
-
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
+	// 获取文件大小
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, err
 	}
-	if err := scanner.Err(); err != nil {
+	fileSize := fileInfo.Size()
+
+	// 计算从哪里开始读取
+	startPos := fileSize - bufferSize
+	if startPos < 0 {
+		startPos = 0
+	}
+
+	// 移动到起始位置
+	_, err = file.Seek(startPos, 0)
+	if err != nil {
 		return nil, err
 	}
 
-	// 反向遍历行
+	// 读取缓冲区内容
+	buffer := make([]byte, bufferSize)
+	n, err := file.Read(buffer)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	content := string(buffer[:n])
+
+	// 分割成行
+	lines := strings.Split(content, "\n")
+
+	// 从后往前查找
+	var linesAfterKeyword []string
+	keyword := "playerlist 99999999 [0]"
+	var foundKeyword bool
+
+	// 从末尾开始遍历
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := lines[i]
-
-		// 将行添加到结果切片
 		linesAfterKeyword = append(linesAfterKeyword, line)
 
-		// 检查是否包含关键字
 		if strings.Contains(line, keyword) {
 			foundKeyword = true
 			break
@@ -421,11 +450,8 @@ func (g *Game) getOnlinePlayerList(id int) ([]string, error) {
 			// 检查是否包含 [Host]
 			if !regexp.MustCompile(`\[Host]`).MatchString(line) {
 				uid := strings.ReplaceAll(matches[1], "\t", "")
-				//uid = strings.ReplaceAll(uid, " ", "")
 				nickName := strings.ReplaceAll(matches[2], "\t", "")
-				//nickName = strings.ReplaceAll(nickName, " ", "")
 				prefab := strings.ReplaceAll(matches[3], "\t", "")
-				//prefab = strings.ReplaceAll(prefab, " ", "")
 				player := uid + "<-@dmp@->" + nickName + "<-@dmp@->" + prefab
 				players = append(players, player)
 			}

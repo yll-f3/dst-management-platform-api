@@ -8,6 +8,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/yuin/gopher-lua"
 )
@@ -67,6 +69,9 @@ func (g *Game) dsModsSetup() error {
 }
 
 func (g *Game) downloadMod(id int, fileURL string) (error, int64) {
+	atomic.AddInt32(&db.ModDownloadExecuting, 1)
+	defer atomic.AddInt32(&db.ModDownloadExecuting, -1)
+
 	var (
 		err     error
 		ugc     bool
@@ -90,30 +95,51 @@ func (g *Game) downloadMod(id int, fileURL string) (error, int64) {
 			logger.Logger.Error("下载模组失败", "err", err)
 			return err, modSize
 		}
+		time.Sleep(500 * time.Millisecond)
 
 		// 2
 		err = g.removeGameOldMod(id)
 		if err != nil {
-			logger.Logger.Warn("移动模组失败", "err", err)
+			logger.Logger.Error("移动模组失败", "err", err)
 			return err, modSize
 		}
 		copyCmd := g.generateModCopyCmd(id)
 		logger.Logger.Debug(copyCmd)
 		err = utils.BashCMD(copyCmd)
 		if err != nil {
-			logger.Logger.Warn("移动模组失败", "err", err)
+			logger.Logger.Error("移动模组失败", "err", err)
 			return err, modSize
 		}
+		time.Sleep(500 * time.Millisecond)
 
 		// 3
+		gameAcfPath := fmt.Sprintf("dst/ugc_mods/%s/%s/appworkshop_322330.acf", g.clusterName, g.worldSaveData[0].WorldName)
+		gameAcfContent, err := utils.ReadLinesToSlice(gameAcfPath)
+		if err != nil {
+			gameAcfContent = []string{}
+		}
 		err = g.processAcf(id)
 		if err != nil {
 			logger.Logger.Error("修改acf文件失败", "err", err)
+			// 下载失败就恢复下载前的acf文件
+			logger.Logger.Info("正在恢复旧的acf文件")
+			for _, world := range g.worldSaveData {
+				gameAcfPath = fmt.Sprintf("dst/ugc_mods/%s/%s/appworkshop_322330.acf", g.clusterName, world.WorldName)
+				writeErr := utils.WriteLinesFromSlice(gameAcfPath, gameAcfContent)
+				if writeErr != nil {
+					logger.Logger.Error("恢复acf文件失败", "err", writeErr)
+				}
+			}
+
 			return err, modSize
 		}
+		time.Sleep(500 * time.Millisecond)
 
 		modSize, err = utils.GetDirSize(fmt.Sprintf("dst/ugc_mods/%s/%s/content/322330/%d", g.clusterName, g.worldSaveData[0].WorldName, id))
+		logger.Logger.DebugF("模组路径为%s", fmt.Sprintf("dst/ugc_mods/%s/%s/content/322330/%d", g.clusterName, g.worldSaveData[0].WorldName, id))
+		logger.Logger.DebugF("模组大小为%d", modSize)
 		if err != nil {
+			logger.Logger.Error("获取模组大小失败", "err", err)
 			return err, modSize
 		}
 
@@ -205,7 +231,8 @@ func (g *Game) processAcf(id int) error {
 			hasMod             bool
 		)
 
-		if len(gameAcfParser.AppWorkshop.WorkshopItemsInstalled) != len(gameAcfParser.AppWorkshop.WorkshopItemDetails) {
+		if len(gameAcfParser.AppWorkshop.WorkshopItemsInstalled) > len(gameAcfParser.AppWorkshop.WorkshopItemDetails) {
+			// 防止index溢出导致接口500
 			return fmt.Errorf("acf文件异常，WorkshopItemsInstalled与WorkshopItemDetails长度不一致")
 		}
 
@@ -351,6 +378,8 @@ func (g *Game) getModConfigureOptions(worldID, modID int, ugc bool) (*[]Configur
 func (g *Game) getModConfigureOptionsValues(worldID, modID int, ugc bool) (*ModORConfig, error) {
 	modORParser := NewModORParser()
 	defer modORParser.close()
+
+	logger.Logger.DebugF("ugc is %t", ugc)
 
 	var modORContent string
 	if g.room.ModInOne {

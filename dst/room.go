@@ -67,8 +67,9 @@ func (g *Game) createRoom() error {
 
 func (g *Game) getClusterIni() string {
 	var (
-		gameMode string
-		lang     string
+		gameMode          string
+		lang              string
+		steamGroupSetting string
 	)
 
 	switch g.room.GameMode {
@@ -93,6 +94,16 @@ func (g *Game) getClusterIni() string {
 		lang = "zh"
 	}
 
+	if g.room.SteamGroupID != "" {
+		steamGroupSetting = `
+
+[STEAM]
+steam_group_admins = ` + strconv.FormatBool(g.room.SteamGroupAdmins) + `
+steam_group_id = ` + g.room.SteamGroupID + `
+steam_group_only = ` + strconv.FormatBool(g.room.SteamGroupOnly) + `
+`
+	}
+
 	contents := `[GAMEPLAY]
 game_mode = ` + gameMode + `
 max_players = ` + strconv.Itoa(g.room.MaxPlayer) + `
@@ -102,6 +113,8 @@ vote_enabled = ` + strconv.FormatBool(g.room.Vote) + `
 vote_kick_enabled = ` + strconv.FormatBool(g.room.Vote) + `
 
 [NETWORK]
+lan_only_cluster = ` + strconv.FormatBool(g.room.Lan) + `
+offline_cluster = ` + strconv.FormatBool(g.room.Offline) + `
 cluster_description = ` + g.room.Description + `
 whitelist_slots = ` + strconv.Itoa(len(g.whitelist)) + `
 cluster_name = ` + g.room.GameName + `
@@ -118,8 +131,7 @@ shard_enabled = true
 bind_ip = 0.0.0.0
 master_ip = ` + g.room.MasterIP + `
 master_port = ` + strconv.Itoa(g.room.MasterPort) + `
-cluster_key = ` + g.room.ClusterKey + `
-`
+cluster_key = ` + g.room.ClusterKey + steamGroupSetting
 
 	logger.Logger.Debug(contents)
 
@@ -510,6 +522,40 @@ func (g *Game) deleteRoom() error {
 	err = utils.RemoveDir(fmt.Sprintf("%s/backup/%d", utils.DmpFiles, g.room.ID))
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (g *Game) getSnapshot() ([]SnapshotFile, error) {
+	sessionID, err := getSessionID(g.worldSaveData[0].savePath)
+	if err != nil {
+		return []SnapshotFile{}, err
+	}
+
+	snapshotPath := fmt.Sprintf("%s/%s", g.worldSaveData[0].sessionPath, sessionID)
+
+	return getSnapshotFiles(snapshotPath)
+}
+
+func (g *Game) deleteSnapshot(filename string) error {
+	for _, world := range g.worldSaveData {
+		sessionID, err := getSessionID(world.savePath)
+		if err != nil {
+			return err
+		}
+
+		sessionFile := fmt.Sprintf("%s/%s/%s", world.sessionPath, sessionID, filename)
+		err = utils.RemoveFile(sessionFile)
+		if err != nil {
+			return err
+		}
+
+		sessionFileMeta := fmt.Sprintf("%s/%s/%s.meta", world.sessionPath, sessionID, filename)
+		err = utils.RemoveFile(sessionFileMeta)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
