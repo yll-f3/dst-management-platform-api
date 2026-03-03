@@ -426,7 +426,7 @@ func (g *Game) modEnable(worldID, modID int, ugc bool) error {
 	}
 
 	newModConfig := &ModORConfig{
-		ConfigurationOptions: make(map[string]interface{}),
+		ConfigurationOptions: make(map[string]any),
 		Enabled:              true,
 	}
 	for _, option := range *options {
@@ -705,6 +705,21 @@ func (g *Game) deleteMod(modID int, fileURL string) error {
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (g *Game) deleteAcf() error {
+	for _, world := range g.worldSaveData {
+		gameAcfPath := fmt.Sprintf("dst/ugc_mods/%s/%s/appworkshop_322330.acf", g.clusterName, world.WorldName)
+		err := utils.RemoveFile(gameAcfPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	dmpModDownloadAcfPath := fmt.Sprintf("%s/mods/ugc/%s/steamapps/workshop/appworkshop_322330.acf", utils.DmpFiles, g.clusterName)
+	_ = utils.RemoveFile(dmpModDownloadAcfPath)
 
 	return nil
 }

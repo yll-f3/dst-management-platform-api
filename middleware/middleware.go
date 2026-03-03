@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"dst-management-platform-api/database/db"
+	"dst-management-platform-api/database/models"
 	"dst-management-platform-api/logger"
 	"dst-management-platform-api/utils"
 	"fmt"
@@ -22,9 +23,27 @@ func TokenCheck() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+
 		c.Set("username", claims.Username)
 		c.Set("nickname", claims.Nickname)
 		c.Set("role", claims.Role)
+
+		// token还有1/2有效期时，刷新token
+		if shouldRefreshToken(claims.ExpiresAt.Time) {
+			logger.Logger.Info("token有效期小于阈值，刷新token")
+			user := models.User{
+				Username: claims.Username,
+				Nickname: claims.Nickname,
+				Role:     claims.Role,
+			}
+			token, err = utils.GenerateJWT(user, []byte(db.JwtSecret), utils.JwtExpirationHours)
+			if err != nil {
+				logger.Logger.ErrorF("刷新Token失败：%v", err)
+			} else {
+				c.Header("X-DMP-NEW-TOKEN", token)
+			}
+		}
+
 		c.Next()
 	}
 }
@@ -54,7 +73,7 @@ func AdminOnly() gin.HandlerFunc {
 
 // CacheControl 缓存控制中间件
 func CacheControl() gin.HandlerFunc {
-	cacheDuration := 12 * time.Hour
+	cacheDuration := 48 * time.Hour
 	return func(c *gin.Context) {
 		// 只对静态资源文件设置缓存
 		if isStaticAsset(c.Request.URL.Path) {
@@ -79,4 +98,16 @@ func isStaticAsset(path string) bool {
 		}
 	}
 	return false
+}
+
+// 判断是否刷新token
+func shouldRefreshToken(exp time.Time) bool {
+	remainingTime := time.Until(exp)
+
+	logger.Logger.DebugF("token剩余有效时间还剩: %.2f小时", remainingTime.Hours())
+
+	totalDuration := time.Duration(utils.JwtExpirationHours) * time.Hour
+
+	// 当剩余时间小于总有效期的 1/2 时刷新
+	return remainingTime > 0 && remainingTime < totalDuration/2
 }

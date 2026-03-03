@@ -438,7 +438,17 @@ func (h *Handler) uploadPost(c *gin.Context) {
 			"message": message.Get(c, "upload save fail"),
 			"data":    nil,
 		})
+
+		return
 	}
+
+	defer func() {
+		err = utils.RemoveDir(uploadPath)
+		if err != nil {
+			logger.Logger.Error("清理上传文件失败", "err", err)
+		}
+	}()
+
 	//保存上传的文件
 	unzipPath := fmt.Sprintf("%s/", uploadPath)
 	savePath := fmt.Sprintf("%s/%s", unzipPath, file.Filename)
@@ -645,13 +655,6 @@ func (h *Handler) uploadPost(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": message.Get(c, "upload success"), "data": nil})
-
-	defer func() {
-		err = utils.RemoveDir(uploadPath)
-		if err != nil {
-			logger.Logger.Error("清理上传文件失败", "err", err)
-		}
-	}()
 }
 
 func (h *Handler) deactivatePost(c *gin.Context) {
@@ -793,8 +796,8 @@ func (h *Handler) activatePost(c *gin.Context) {
 			err = scheduler.UpdateJob(&scheduler.JobConfig{
 				Name:     fmt.Sprintf("%d-%s-Announce", room.ID, strings.ReplaceAll(announce.ID, "-", "")),
 				Func:     scheduler.Announce,
-				Args:     []interface{}{game, announce.Content},
-				TimeType: "second",
+				Args:     []any{game, announce.Content},
+				TimeType: scheduler.SecondType,
 				Interval: announce.Interval,
 				DayAt:    "",
 			})

@@ -314,8 +314,8 @@ func (h *Handler) announcePut(c *gin.Context) {
 				err = scheduler.UpdateJob(&scheduler.JobConfig{
 					Name:     fmt.Sprintf("%d-%s-Announce", room.ID, strings.ReplaceAll(announce.ID, "-", "")),
 					Func:     scheduler.Announce,
-					Args:     []interface{}{game, announce.Content},
-					TimeType: "second",
+					Args:     []any{game, announce.Content},
+					TimeType: scheduler.SecondType,
 					Interval: announce.Interval,
 					DayAt:    "",
 				})

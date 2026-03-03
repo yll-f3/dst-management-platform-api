@@ -1,10 +1,12 @@
 package utils
 
-const Version = "v3.0.7"
+const Version = "v3.0.9"
 
 const ApiVersion = "v3"
 
 const HttpTimeout = 30
+
+const JwtExpirationHours = 24
 
 const GameModSettingPath = "dst/mods/dedicated_server_mods_setup.lua"
 

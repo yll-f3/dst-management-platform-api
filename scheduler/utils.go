@@ -27,12 +27,19 @@ var (
 
 type JobConfig struct {
 	Name     string
-	Func     interface{}
-	Args     []interface{}
+	Func     any
+	Args     []any
 	TimeType string
 	Interval int
 	DayAt    string
 }
+
+const (
+	SecondType = "second"
+	MinuteType = "minute"
+	HourType   = "hour"
+	DayType    = "day"
+)
 
 type Handler struct {
 	roomDao          *dao.RoomDAO

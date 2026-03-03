@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -109,6 +110,38 @@ func (h *Handler) execGamePost(c *gin.Context) {
 			updateCmd := fmt.Sprintf("cd ~/steamcmd && ./steamcmd.sh +login anonymous +force_install_dir ~/dst +app_update 343050 validate +quit")
 			_ = utils.BashCMD(updateCmd)
 			db.DstUpdating = false
+
+			// 如果需要重启，则重启激活的房间
+			var globalSettings models.GlobalSetting
+			err = h.globalSettingDao.GetGlobalSetting(&globalSettings)
+			if err != nil {
+				logger.Logger.Error("获取全局设置失败", "err", err)
+				return
+			}
+
+			if !globalSettings.AutoUpdateRestart {
+				return
+			}
+
+			roomBasic, err := h.roomDao.GetRoomBasic()
+			if err != nil {
+				logger.Logger.Error("获取全局房间信息失败", "err", err)
+				return
+			}
+			for _, rb := range *roomBasic {
+				if !rb.Status {
+					continue
+				}
+				room, worlds, roomSetting, err = h.fetchGameInfo(rb.RoomID)
+				if err != nil {
+					logger.Logger.Error("获取基本信息失败", "err", err)
+					continue
+				}
+				game = dst.NewGameController(room, worlds, roomSetting, c.Request.Header.Get("X-I18n-Lang"))
+				_ = game.StopAllWorld()
+				_ = game.StartAllWorld()
+				time.Sleep(5 * time.Second)
+			}
 		}()
 
 		c.JSON(http.StatusOK, gin.H{"code": 200, "message": message.Get(c, "updating"), "data": nil})
@@ -151,6 +184,19 @@ func (h *Handler) execGamePost(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"code": 200, "message": message.Get(c, "announce success"), "data": nil})
+		return
+	case "systemMsg":
+		if reqForm.Extra == "" {
+			c.JSON(http.StatusOK, gin.H{"code": 201, "message": message.Get(c, "system msg fail"), "data": nil})
+			return
+		}
+		err = game.SystemMsg(reqForm.Extra)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{"code": 201, "message": message.Get(c, "system msg fail"), "data": nil})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"code": 200, "message": message.Get(c, "system msg success"), "data": nil})
 		return
 	case "console":
 		if reqForm.Extra == "" {
@@ -312,7 +358,7 @@ func (h *Handler) connectionCodeGet(c *gin.Context) {
 			}
 			db.InternetIP = internetIp
 		} else {
-			logger.Logger.Info("发现缓存的公网IP")
+			logger.Logger.Debug("发现缓存的公网IP")
 			internetIp = db.InternetIP
 		}
 

@@ -324,8 +324,8 @@ func (h *Handler) globalSettingsPost(c *gin.Context) {
 		err = scheduler.UpdateJob(&scheduler.JobConfig{
 			Name:     "onlinePlayerGet",
 			Func:     scheduler.OnlinePlayerGet,
-			Args:     []interface{}{reqForm.PlayerGetFrequency, reqForm.UIDMaintainEnable},
-			TimeType: "second",
+			Args:     []any{reqForm.PlayerGetFrequency, reqForm.UIDMaintainEnable},
+			TimeType: scheduler.SecondType,
 			Interval: reqForm.PlayerGetFrequency,
 			DayAt:    "",
 		})
@@ -342,8 +342,8 @@ func (h *Handler) globalSettingsPost(c *gin.Context) {
 			err = scheduler.UpdateJob(&scheduler.JobConfig{
 				Name:     "systemMetricsGet",
 				Func:     scheduler.SystemMetricsGet,
-				Args:     []interface{}{reqForm.SysMetricsSetting},
-				TimeType: "minute",
+				Args:     []any{reqForm.SysMetricsSetting},
+				TimeType: scheduler.MinuteType,
 				Interval: 1,
 				DayAt:    "",
 			})
@@ -358,14 +358,14 @@ func (h *Handler) globalSettingsPost(c *gin.Context) {
 		}
 	}
 
-	if dbGlobalSettings.AutoUpdateEnable != reqForm.AutoUpdateEnable || dbGlobalSettings.AutoUpdateSetting != reqForm.AutoUpdateSetting {
+	if dbGlobalSettings.AutoUpdateEnable != reqForm.AutoUpdateEnable || dbGlobalSettings.AutoUpdateSetting != reqForm.AutoUpdateSetting || dbGlobalSettings.AutoUpdateRestart != reqForm.AutoUpdateRestart {
 		needUpdateDB = true
 		if reqForm.AutoUpdateEnable {
 			err = scheduler.UpdateJob(&scheduler.JobConfig{
 				Name:     "gameUpdate",
 				Func:     scheduler.GameUpdate,
-				Args:     []interface{}{reqForm.AutoUpdateEnable},
-				TimeType: "day",
+				Args:     []any{reqForm.AutoUpdateEnable, reqForm.AutoUpdateRestart},
+				TimeType: scheduler.DayType,
 				Interval: 0,
 				DayAt:    reqForm.AutoUpdateSetting,
 			})

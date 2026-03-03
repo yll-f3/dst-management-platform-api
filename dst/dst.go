@@ -67,6 +67,10 @@ func (g *Game) Announce(message string) error {
 	return g.announce(message)
 }
 
+func (g *Game) SystemMsg(message string) error {
+	return g.systemMsg(message)
+}
+
 // ConsoleCmd 指定世界执行命令
 func (g *Game) ConsoleCmd(cmd string, worldID int) error {
 	return g.consoleCmd(cmd, worldID)
@@ -250,4 +254,9 @@ func (g *Game) GetSnapshot() ([]SnapshotFile, error) {
 // DeleteSnapshot 删除饥荒存档文件，所有世界
 func (g *Game) DeleteSnapshot(filename string) error {
 	return g.deleteSnapshot(filename)
+}
+
+// DeleteAcf 删除acf文件
+func (g *Game) DeleteAcf() error {
+	return g.deleteAcf()
 }
